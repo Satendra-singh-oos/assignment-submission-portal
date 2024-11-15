@@ -1,15 +1,22 @@
 import mongoose, { Schema } from "mongoose";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import { AvailableUserRoles, UserRolesEnum } from "../constant.js";
 
 const userSchema = new Schema(
   {
+    // _id: {
+    //   type: String,
+    //   required: [true, "id is required"],
+    //   trim: true,
+    //   unique: true,
+    //   lowercase: true,
+    // },
     username: {
       type: String,
       required: [true, "username is required"],
       unique: true,
       trim: true,
-      lowercase: true,
       index: true,
     },
     email: {
@@ -25,8 +32,8 @@ const userSchema = new Schema(
     },
     role: {
       type: String,
-      default: "User",
-      enum: ["User", "Admin"],
+      enum: AvailableUserRoles,
+      default: UserRolesEnum.USER,
     },
   },
   { timestamps: true }
@@ -49,6 +56,7 @@ userSchema.methods.genrateAccessToken = function () {
       _id: this._id,
       email: this.email,
       username: this.username,
+      role: this.role,
     },
     process.env.ACCESS_TOKEN_SECRET,
     { expiresIn: process.env.ACCESS_TOKEN_EXPIRY }

@@ -1,14 +1,20 @@
 import mongoose, { Schema } from "mongoose";
+import {
+  ASSIGNMENTStatusEnum,
+  AvailableAssignmentStatus,
+} from "../constant.js";
 
 const assignmentSchema = new Schema(
   {
     userId: {
       type: Schema.Types.ObjectId,
       ref: "User",
+      required: true,
     },
     adminId: {
       type: Schema.Types.ObjectId,
       ref: "User",
+      required: true,
     },
     task: {
       type: String,
@@ -16,8 +22,8 @@ const assignmentSchema = new Schema(
     },
     status: {
       type: String,
-      default: "Pending",
-      enum: ["Accepted", "Pending", "Rejected"],
+      enum: AvailableAssignmentStatus,
+      default: ASSIGNMENTStatusEnum.PENDING,
     },
   },
   { timestamps: true }
