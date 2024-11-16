@@ -13,3 +13,10 @@ export const ASSIGNMENTStatusEnum = {
   REJECTED: "REJECTED",
 };
 export const AvailableAssignmentStatus = Object.values(ASSIGNMENTStatusEnum);
+
+export const UserLoginType = {
+  GOOGLE: "GOOGLE",
+  EMAIL_PASSWORD: "EMAIL_PASSWORD",
+};
+
+export const AvailableSocialLogins = Object.values(UserLoginType);

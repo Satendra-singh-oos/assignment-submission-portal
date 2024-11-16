@@ -1,4 +1,4 @@
-import { UserRolesEnum } from "../constant.js";
+import { UserLoginType, UserRolesEnum } from "../constant.js";
 import { Assignment } from "../models/assignment.model.js";
 import { User } from "../models/user.model.js";
 import { ApiError } from "../utils/ApiError.js";
@@ -10,7 +10,7 @@ import {
   userSchemaValidation,
 } from "../utils/JoiValidation.js";
 
-const genrateAccessToken = async (userId) => {
+const generateAccessToken = async (userId) => {
   try {
     const user = await User.findById(userId);
 
@@ -46,15 +46,6 @@ const registerUser = asyncHandler(async (req, res) => {
   // if exist throw error
 
   if (existingUser) {
-    // return res
-    //   .status(409)
-    //   .json(
-    //     new ApiError(
-    //  409,
-    //     "UserName Or Email Allredy exist in db try to login"
-    //     )
-    //   );
-
     throw new ApiError(
       409,
       "UserName Or Email Allredy exist in db try to login"
@@ -68,6 +59,8 @@ const registerUser = asyncHandler(async (req, res) => {
       username.charAt(0).toUpperCase() + username.slice(1).toLowerCase(), // make sure the saved username will have first letter as cappital and other as small
     email,
     password,
+    role: UserRolesEnum.USER,
+    loginType: UserLoginType.EMAIL_PASSWORD,
   });
 
   const newUserId = newUser._id;
@@ -107,6 +100,19 @@ const loginUser = asyncHandler(async (req, res) => {
     );
   }
 
+  if (user.loginType !== UserLoginType.EMAIL_PASSWORD) {
+    // If user is registered with some other method, we will ask him/her to use the same method as registered.
+
+    throw new ApiError(
+      400,
+      "You have previously registered using " +
+        user.loginType?.toLowerCase() +
+        ". Please use the " +
+        user.loginType?.toLowerCase() +
+        " login option to access your account."
+    );
+  }
+
   // check if the given passowrd is correct or not
   const isPasswordCorrect = await user.isPasswordCorrect(password);
 
@@ -116,7 +122,7 @@ const loginUser = asyncHandler(async (req, res) => {
   }
 
   //genrate the access token for user
-  const { accessToken } = await genrateAccessToken(user._id);
+  const { accessToken } = await generateAccessToken(user._id);
 
   const loggedInUser = await User.findById(user._id).select("-password");
 
@@ -136,6 +142,26 @@ const loginUser = asyncHandler(async (req, res) => {
         "User logged In Successfully"
       )
     );
+});
+
+const handleSocialLogin = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user?._id);
+
+  if (!user) {
+    throw new ApiError(404, "User does not exist");
+  }
+
+  const { accessToken } = await generateAccessToken(user._id);
+
+  const options = {
+    httpOnly: true,
+    secure: true,
+  };
+
+  return res.status(301).cookie("accessToken", accessToken, options).redirect(
+    // redirect user to the frontend with access and refresh token in case user is not using cookies
+    `${process.env.CLIENT_SSO_REDIRECT_URL}?accessToken=${accessToken}`
+  );
 });
 
 const uploadAssignment = asyncHandler(async (req, res) => {
@@ -207,4 +233,10 @@ const getAllAdmin = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, admins, "Fetched All Admin Succesfully"));
 });
 
-export { registerUser, loginUser, uploadAssignment, getAllAdmin };
+export {
+  registerUser,
+  loginUser,
+  uploadAssignment,
+  getAllAdmin,
+  handleSocialLogin,
+};
