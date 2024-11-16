@@ -1,7 +1,7 @@
 import { isValidObjectId } from "mongoose";
 import { Assignment } from "../models/assignment.model.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
-import { ApiError } from "../utils/ApiError.js";
+
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { ASSIGNMENTStatusEnum } from "../constant.js";
 
@@ -25,7 +25,7 @@ const getMyAssignments = asyncHandler(async (req, res) => {
 const acceptAssignment = asyncHandler(async (req, res) => {
   const { id } = req.params;
   if (!isValidObjectId(id)) {
-    throw new ApiError(401, "Not A Valid Id");
+    return res.status(401).json(new ApiResponse(401, {}, "Not A Valid Id"));
   }
 
   // check dose assignment exist or not
@@ -34,16 +34,23 @@ const acceptAssignment = asyncHandler(async (req, res) => {
 
   // if assignment dose not exist throw error
   if (!assignemnt) {
-    throw new ApiError(404, "Assignment dose not exist");
+    return res
+      .status(404)
+      .json(new ApiResponse(404, {}, "Assignment dose not exist"));
   }
 
   // now check if the currnet user got assgined to this assignment
 
   if (assignemnt.adminId.toString() !== req.user?.id.toString()) {
-    throw new ApiError(
-      404,
-      "You Are Not Authorized Do Accept / Reject This Assignment"
-    );
+    return res
+      .status(404)
+      .json(
+        new ApiResponse(
+          404,
+          {},
+          "You Are Not Authorized Do Accept / Reject This Assignment"
+        )
+      );
   }
 
   //update the assginment status
@@ -63,7 +70,7 @@ const acceptAssignment = asyncHandler(async (req, res) => {
 const rejectAssignment = asyncHandler(async (req, res) => {
   const { id } = req.params;
   if (!isValidObjectId(id)) {
-    throw new ApiError(401, "Not A Valid Id");
+    return res.status(401).json(new ApiResponse(401, {}, "Not A Valid Id"));
   }
 
   // check dose assignment exist or not
@@ -72,16 +79,23 @@ const rejectAssignment = asyncHandler(async (req, res) => {
 
   // if assignment dose not exist throw error
   if (!assignemnt) {
-    throw new ApiError(404, "Assignment dose not exist");
+    return res
+      .status(404)
+      .json(new ApiResponse(401, {}, "Assignment dose not exist"));
   }
 
   // now check if the currnet user got assgined to this assignment
 
   if (assignemnt.adminId.toString() !== req.user?.id.toString()) {
-    throw new ApiError(
-      404,
-      "You Are Not Authorized Do Accept / Reject This Assignment"
-    );
+    return res
+      .status(404)
+      .json(
+        new ApiResponse(
+          401,
+          {},
+          "You Are Not Authorized Do Accept / Reject This Assignment"
+        )
+      );
   }
 
   //update the assginment status

@@ -35,7 +35,7 @@ const loginSchemaValidation = Joi.object({
 });
 
 const assignmentSchemaValidation = Joi.object({
-  userId: Joi.string().required(),
+  // userId: Joi.string().required(),
   admin: Joi.string()
     .min(3)
     .max(25)

@@ -1,8 +1,9 @@
 import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import { User } from "../models/user.model.js";
-import { ApiError } from "./ApiError.js";
+
 import { UserLoginType, UserRolesEnum } from "../constant.js";
+import { ApiResponse } from "./ApiResponse.js";
 
 try {
   passport.serializeUser((user, next) => {
@@ -13,11 +14,12 @@ try {
     try {
       const user = await User.findById(id);
       if (user) next(null, user);
-      else next(new ApiError(404, "User does not exist"), null);
+      else next(new ApiResponse(404, {}, "User does not exist"), null);
     } catch (error) {
       next(
-        new ApiError(
+        new ApiResponse(
           500,
+          {},
           "Something went wrong while deserializing the user. Error: " + error
         ),
         null
@@ -43,8 +45,9 @@ try {
           if (user.loginType !== UserLoginType.GOOGLE) {
             // if user is registered with some other methord,we will ask him/her to use same method as login
             next(
-              new ApiError(
+              new ApiResponse(
                 400,
+                {},
                 "You have previously registered using " +
                   user.loginType?.toLowerCase()?.split("_").join(" ") +
                   ". Please use the " +
@@ -76,7 +79,10 @@ try {
           if (createdUser) {
             next(null, createdUser);
           } else {
-            next(new ApiError(500, "Error while registering the user"), null);
+            next(
+              new ApiResponse(500, {}, "Error while registering the user"),
+              null
+            );
           }
         }
       }

@@ -9,6 +9,7 @@ import {
 } from "../controllers/user.controller.js";
 import { verifyJWT } from "../middlewares/auth.middleware.js";
 import "../utils/passport.js";
+import { ApiResponse } from "../utils/ApiResponse.js";
 
 const router = Router();
 
@@ -34,5 +35,11 @@ router
 
 router.route("/upload").post(verifyJWT, uploadAssignment);
 router.route("/admins").get(verifyJWT, getAllAdmin);
+
+router.route("/profile").get(verifyJWT, (_, res) => {
+  return res
+    .status(200)
+    .json(new ApiResponse(200, "Login With Google OAuth Successfully"));
+});
 
 export default router;

@@ -1,7 +1,7 @@
 import { UserLoginType, UserRolesEnum } from "../constant.js";
 import { Assignment } from "../models/assignment.model.js";
 import { User } from "../models/user.model.js";
-import { ApiError } from "../utils/ApiError.js";
+
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import {
@@ -20,59 +20,92 @@ const generateAccessToken = async (userId) => {
     await user.save({ validateBeforeSave: false });
     return { accessToken };
   } catch (error) {
-    throw new ApiError(
-      500,
-      "Something went wrong while generating the access token"
-    );
+    return res
+      .status(500)
+      .json(
+        new ApiResponse(
+          500,
+          {},
+          "Something went wrong while generating the access token"
+        )
+      );
   }
 };
 
 const registerUser = asyncHandler(async (req, res) => {
-  //validate the req.body with joi validation
-  const { error, value } = userSchemaValidation.validate(req.body);
+  try {
+    //validate the req.body with joi validation
+    const { error, value } = userSchemaValidation.validate(req.body);
 
-  // throw error if something wrong in validating of data
-  if (error) {
-    throw new ApiError(406, error.message);
+    // throw error if something wrong in validating of data
+    if (error) {
+      return res
+        .status(400)
+        .json(new ApiResponse(400, {}, error?.message || "Not Valid Data"));
+    }
+
+    const { username, email, password } = value;
+
+    // check dose user already exist with this username or email
+    const existingUser = await User.findOne({
+      $or: [{ username }, { email }],
+    });
+
+    // if exist or null throw error
+    if (existingUser) {
+      return res
+        .status(409)
+        .json(
+          new ApiResponse(
+            409,
+            {},
+            "UserName Or Email Allredy exist in db try to login"
+          )
+        );
+    }
+
+    // create a new user
+
+    const newUser = await User.create({
+      username:
+        username.charAt(0).toUpperCase() + username.slice(1).toLowerCase(),
+      email,
+      password,
+      role: UserRolesEnum.USER,
+      loginType: UserLoginType.EMAIL_PASSWORD,
+    });
+
+    const newUserId = newUser._id;
+
+    const createdUser = await User.findById(newUserId).select("-password");
+
+    if (!createdUser) {
+      return res
+        .status(500)
+        .json(
+          new ApiResponse(
+            500,
+            {},
+            "Something went wrong while registering the user"
+          )
+        );
+    }
+    return res
+      .status(200)
+      .json(new ApiResponse(200, createdUser, "User Created Successfully"));
+  } catch (error) {
+    return res
+      .status(error.code === 11000 ? 409 : 500)
+      .json(
+        new ApiResponse(
+          error.code === 11000 ? 409 : 500,
+          {},
+          error.code === 11000
+            ? "UserName Or Email Allredy exist in db try to login"
+            : "Something went wrong while registering the user"
+        )
+      );
   }
-
-  const { username, email, password } = value;
-
-  // check dose user already exist with this username or email
-  const existingUser = await User.findOne({
-    $or: [{ username }, { email }],
-  });
-
-  // if exist throw error
-
-  if (existingUser) {
-    throw new ApiError(
-      409,
-      "UserName Or Email Allredy exist in db try to login"
-    );
-  }
-
-  // create a new user
-
-  const newUser = await User.create({
-    username:
-      username.charAt(0).toUpperCase() + username.slice(1).toLowerCase(), // make sure the saved username will have first letter as cappital and other as small
-    email,
-    password,
-    role: UserRolesEnum.USER,
-    loginType: UserLoginType.EMAIL_PASSWORD,
-  });
-
-  const newUserId = newUser._id;
-
-  const createdUser = await User.findById(newUserId).select("-password");
-
-  if (!createdUser) {
-    throw new ApiError(500, "Something went wrong while registering the user");
-  }
-  return res
-    .status(200)
-    .json(new ApiResponse(200, createdUser, "User Created Successfully"));
 });
 
 const loginUser = asyncHandler(async (req, res) => {
@@ -83,7 +116,9 @@ const loginUser = asyncHandler(async (req, res) => {
   // throw error if something wrong in validating of data
 
   if (error) {
-    throw new ApiError(406, error.message);
+    return res
+      .status(406)
+      .json(new ApiResponse(500, {}, error?.message || "Not Valid Data"));
   }
 
   const { email, password } = value;
@@ -92,36 +127,45 @@ const loginUser = asyncHandler(async (req, res) => {
 
   const user = await User.findOne({ email });
 
-  // if user dose not exist throw error
   if (!user) {
-    throw new ApiError(
-      400,
-      "User Email Dose Not Exist , Please Register First"
-    );
+    return res
+      .status(400)
+      .json(
+        new ApiResponse(
+          400,
+          {},
+          "User Email Dose Not Exist , Please Register First"
+        )
+      );
   }
 
   if (user.loginType !== UserLoginType.EMAIL_PASSWORD) {
     // If user is registered with some other method, we will ask him/her to use the same method as registered.
 
-    throw new ApiError(
-      400,
-      "You have previously registered using " +
-        user.loginType?.toLowerCase() +
-        ". Please use the " +
-        user.loginType?.toLowerCase() +
-        " login option to access your account."
-    );
+    return res
+      .status(400)
+      .json(
+        new ApiResponse(
+          400,
+          {},
+          "You have previously registered using " +
+            user.loginType?.toLowerCase() +
+            ". Please use the " +
+            user.loginType?.toLowerCase() +
+            " login option to access your account."
+        )
+      );
   }
 
   // check if the given passowrd is correct or not
   const isPasswordCorrect = await user.isPasswordCorrect(password);
 
-  // if password is not correct throw error
   if (!isPasswordCorrect) {
-    throw new ApiError(400, "Password is Incorrect");
+    return res
+      .status(400)
+      .json(new ApiResponse(400, {}, "Password is Incorrect"));
   }
 
-  //genrate the access token for user
   const { accessToken } = await generateAccessToken(user._id);
 
   const loggedInUser = await User.findById(user._id).select("-password");
@@ -148,7 +192,9 @@ const handleSocialLogin = asyncHandler(async (req, res) => {
   const user = await User.findById(req.user?._id);
 
   if (!user) {
-    throw new ApiError(404, "User does not exist");
+    return res
+      .status(404)
+      .json(new ApiResponse(404, {}, "User does not exist"));
   }
 
   const { accessToken } = await generateAccessToken(user._id);
@@ -165,24 +211,33 @@ const handleSocialLogin = asyncHandler(async (req, res) => {
 });
 
 const uploadAssignment = asyncHandler(async (req, res) => {
+  // check for userId
+  if (!req.user?._id) {
+    return res
+      .status(401)
+      .json(new ApiResponse(401, {}, "Unauthorized request"));
+  }
   //validate the req.body with joi validation
   const { error, value } = assignmentSchemaValidation.validate(req.body);
 
-  // throw error if something wrong in validating of data
-
   if (error) {
-    throw new ApiError(401, error.message);
+    return res
+      .status(401)
+      .json(new ApiResponse(401, {}, error?.message || "Not A Valid Data"));
   }
 
-  const { userId, task, admin } = value;
+  const { task, admin } = value;
 
-  // check dose the given userId exist in database or not
-  const user = await User.findOne({ username: userId });
+  // ? Removed Due To Extra Db Call before we getting userId from the body and haveing an extra check from db
+  // // check dose the given userId exist in database or not
+  // const user = await User.findOne({ username: userId });
 
-  // if user dose not throw error
-  if (!user) {
-    throw new ApiError(401, "User Dose Not Exist With This UserId");
-  }
+  // // if user dose not throw error
+  // if (!user) {
+  // return res
+  //  .status(401)
+  //  .json(new ApiResponse(401, {}, "User Dose Not Exist With This UserId"));
+  // }
 
   // check dose the admin user exist or not
 
@@ -190,15 +245,16 @@ const uploadAssignment = asyncHandler(async (req, res) => {
     $and: [{ username: admin }, { role: UserRolesEnum.ADMIN }],
   });
 
-  // if admin user dose not exist throw error
   if (!adminUser) {
-    throw new ApiError(401, "Admin Dose Not Exist Check Again");
+    return res
+      .status(401)
+      .json(new ApiResponse(401, {}, "Admin Dose Not Exist Check Again"));
   }
 
   // create the assignemnt
 
   const assignment = await Assignment.create({
-    userId: user._id,
+    userId: req.user?._id,
     task,
     adminId: adminUser._id,
   });
@@ -208,7 +264,15 @@ const uploadAssignment = asyncHandler(async (req, res) => {
   );
 
   if (!uploadedAssignment) {
-    throw new ApiError(500, "Something went wrong while uploading Assignment");
+    return res
+      .status(500)
+      .json(
+        new ApiResponse(
+          500,
+          {},
+          "Something went wrong while uploading Assignment"
+        )
+      );
   }
 
   return res
